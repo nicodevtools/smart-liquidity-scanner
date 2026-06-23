@@ -1,0 +1,54 @@
+//@version=5
+// Smart Liquidity Scanner - Nico's Trading Tool
+// Detecta zonas de liquidez, S/R dinámicos y Fair Value Gaps
+indicator("Smart Liquidity Scanner", overlay=true)
+
+// === Liquidity Zones Detection ===
+lookback = input.int(50, "Lookback Period", minval=10)
+sensitivity = input.float(1.0, "Sensitivity", minval=0.1, maxval=5.0, step=0.1)
+
+// Swing Highs and Lows
+swingHigh = ta.highest(high, lookback)
+swingLow = ta.lowest(low, lookback)
+
+// Dynamic Support & Resistance
+resistance = ta.pivothigh(high, 10, 10)
+support = ta.pivotlow(low, 10, 10)
+
+// Fair Value Gap Detection
+bullishFVG = low[2] > high  // Gap up
+bearishFVG = high[2] < low  // Gap down
+
+// Order Block Detection
+bullishOB = close > open and close[1] < open[1] and high > high[1] and low < low[1]
+bearishOB = close < open and close[1] > open[1] and high > high[1] and low < low[1]
+
+// Volume Spike
+avgVol = ta.sma(volume, 20)
+volSpike = volume > avgVol * 1.5
+
+// Plotting
+plot(resistance, "Resistance", color=color.red, linewidth=2, style=plot.style_circles)
+plot(support, "Support", color=color.green, linewidth=2, style=plot.style_circles)
+
+// FVG Background
+bgcolor(bullishFVG ? color.new(color.green, 85) : na, title="Bullish FVG")
+bgcolor(bearishFVG ? color.new(color.red, 85) : na, title="Bearish FVG")
+
+// OB Markers
+plotshape(bullishOB and volSpike ? low : na, "Bullish OB", shape.triangleup, location.belowbar, color.green, size=size.small)
+plotshape(bearishOB and volSpike ? high : na, "Bearish OB", shape.triangledown, location.abovebar, color.red, size=size.small)
+
+// Alerts
+alertcondition(bullishOB and volSpike, "Bullish Order Block + Volume", "🚀 Bullish OB detected!")
+alertcondition(bearishOB and volSpike, "Bearish Order Block + Volume", "🔻 Bearish OB detected!")
+alertcondition(bullishFVG, "Bullish FVG", "📈 Fair Value Gap UP")
+alertcondition(bearishFVG, "Bearish FVG", "📉 Fair Value Gap DOWN")
+
+// Dashboard
+var table infoTable = table.new(position.top_right, 2, 4, bgcolor=color.new(color.black, 80))
+if barstate.islast
+    table.cell(infoTable, 0, 0, "Smart Liq Scanner", text_color=color.white, text_size=size.large)
+    table.cell(infoTable, 0, 1, "S/R: " + (support > 0 ? "✓" : "..."), text_color=support > 0 ? color.green : color.gray)
+    table.cell(infoTable, 0, 2, "FVG: " + (bullishFVG or bearishFVG ? "✓" : "✗"), text_color=bullishFVG ? color.green : bearishFVG ? color.red : color.gray)
+    table.cell(infoTable, 0, 3, "OB: " + (bullishOB or bearishOB ? "✓" : "✗"), text_color=bullishOB ? color.green : bearishOB ? color.red : color.gray)
